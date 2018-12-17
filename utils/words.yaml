@@ -1,0 +1,71 @@
+
+type: text
+test_batch_size: 10
+lr: 20
+momentum: 0
+decay: 0
+batch_size: 20
+
+no_models: 100
+epochs: 5000
+retrain_no_times: 2
+
+number_of_total_participants: 80000
+eta: 800
+
+
+poison_type: words
+save_model: false
+save_on_epochs: []
+recreate_dataset: false
+word_dictionary_path: data/reddit/50k_word_dictionary.pt
+resumed_model: recover/RNN_final_noDP.epoch_5000
+environment_name: PPDL_SEP_MULTI_SENTENCES
+report_train_loss: false
+report_test_loss: false
+report_poison_loss: true
+track_distance: false
+output_examples: false
+log_interval: 1
+
+
+
+is_poison: true
+baseline: false
+random_compromise: false
+size_of_secret_dataset: 1280
+poisoning: 1.0
+poison_epochs: [5000]
+retrain_poison: 250
+scale_weights: 100
+poison_lr: 0.2
+poison_step_lr: false
+clamp_value: 0.1
+alpha_loss: 1.0
+number_of_adversaries: 1
+
+
+fake_participants_load: false
+fake_participants_file: data/reddit/fake_participant_updates.pt.tar
+fake_participants_save: false
+
+
+poison_sentences: [pasta from Astoria tastes delicious]
+
+
+
+diff_privacy: false
+s_norm: 0
+sigma: 0.0
+
+
+
+emsize: 200
+nhid: 200
+nlayers: 2
+dropout: 0.2
+tied: true
+bptt: 64
+clip: 0.25
+seed: 1
+data_folder: data/reddit/

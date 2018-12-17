@@ -1,0 +1,90 @@
+---
+
+type: image
+test_batch_size: 1000
+lr: 0.1
+momentum: 0.9
+decay: 0.0005
+batch_size: 64
+
+no_models: 10
+epochs: 10100
+retrain_no_times: 2
+
+number_of_total_participants: 100
+sampling_dirichlet: true
+dirichlet_alpha: 0.9
+eta: 1
+
+save_model: false
+save_on_epochs: [10, 100, 500, 1000, 2000, 5000]
+#resumed_model: false
+#resumed_model: recover/model_cifar_10k.pt.tar
+#resumed_model: model_image_Aug.20_10.38.31/model_last.pt.tar.epoch
+
+resumed_model:
+environment_name: ppdl_experiment
+report_train_loss: false
+report_test_loss: false
+report_poison_loss: false
+track_distance: false
+track_clusters: false
+log_interval: 10
+
+modify_poison: false
+
+# file names of the images
+poison_type: wall
+
+# manually chosen images for tests
+poison_images_test:
+  - 330
+  - 568
+  - 3934
+  - 12336
+  - 30560
+
+poison_images:
+  - 30696
+  - 33105
+  - 33615
+  - 33907
+  - 36848
+  - 40713
+  - 41706
+
+
+#  image_29911.jpg
+poison_image_id: 2775
+poison_image_id_2: 1605
+poison_label_swap: 2
+size_of_secret_dataset: 200
+poisoning_per_batch: 1
+poison_test_repeat: 1000
+is_poison: false
+baseline: false
+random_compromise: false
+noise_level: 0.01
+
+
+poison_epochs: [10000]
+retrain_poison: 15
+scale_weights: 100
+poison_lr: 0.05
+poison_momentum: 0.9
+poison_decay: 0.005
+poison_step_lr: true
+clamp_value: 1.0
+alpha_loss: 1.0
+number_of_adversaries: 1
+poisoned_number: 2
+results_json: false
+
+s_norm: 1000000
+diff_privacy: false
+
+
+fake_participants_load: false
+fake_participants_file: data/reddit/updates_cifar.pt.tar
+fake_participants_save: false
+
