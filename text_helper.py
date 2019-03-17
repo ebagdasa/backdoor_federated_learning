@@ -66,16 +66,16 @@ class TextHelper(Helper):
 
     @staticmethod
     def repackage_hidden(h):
-        """Wraps hidden states in new Variables, to detach them from their history."""
-        if type(h) == Variable:
-            return Variable(h.data)
+        """Wraps hidden states in new Tensors, to detach them from their history."""
+        if isinstance(h, torch.Tensor):
+            return h.detach()
         else:
             return tuple(TextHelper.repackage_hidden(v) for v in h)
 
     def get_batch(self, source, i, evaluation=False):
         seq_len = min(self.params['bptt'], len(source) - 1 - i)
-        data = Variable(source[i:i + seq_len], volatile=evaluation)
-        target = Variable(source[i + 1:i + 1 + seq_len].view(-1))
+        data = source[i:i + seq_len]
+        target = source[i + 1:i + 1 + seq_len].view(-1)
         return data, target
 
     @staticmethod

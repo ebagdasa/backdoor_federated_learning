@@ -107,7 +107,7 @@ class Helper:
         size = 0
         for name, layer in model.named_parameters():
             size += layer.view(-1).shape[0]
-        sum_var = Variable(torch.cuda.FloatTensor(size).fill_(0))
+        sum_var = torch.cuda.FloatTensor(size).fill_(0)
         size = 0
         for name, layer in model.named_parameters():
             sum_var[size:size + layer.view(-1).shape[0]] = (

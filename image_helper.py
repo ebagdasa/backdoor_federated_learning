@@ -1,7 +1,6 @@
 from collections import defaultdict
 
 import torch
-from torch.autograd import Variable
 import torch.utils.data
 
 from helper import Helper
@@ -232,11 +231,10 @@ class ImageHelper(Helper):
 
     def get_batch(self, train_data, bptt, evaluation=False):
         data, target = bptt
+        data = data.cuda()
+        target = target.cuda()
         if evaluation:
-            data = Variable(data.cuda(async=True), volatile=True)
-            target = Variable(target.cuda(async=True), volatile=True)
-        else:
-            data = Variable(data.cuda(async=True), volatile=False)
-            target = Variable(target.cuda(async=True), volatile=False)
+            data.requires_grad_(False)
+            target.requires_grad_(False)
         return data, target
 

@@ -35,9 +35,6 @@ criterion = torch.nn.CrossEntropyLoss()
 # random.seed(1)
 
 def train(helper, epoch, train_data_sets, local_model, target_model, is_poison, last_weight_accumulator=None):
-    #
-    # model_updates_list = dict()
-    # target_one_vec = helper.get_one_vec(target_model)
 
     ### Accumulate weights for all participants.
     weight_accumulator = dict()
@@ -50,9 +47,7 @@ def train(helper, epoch, train_data_sets, local_model, target_model, is_poison, 
     ### This is for calculating distances
     target_params_variables = dict()
     for name, param in target_model.named_parameters():
-        target_params_variables[name] = Variable(torch.from_numpy(target_model.state_dict()[name].cpu().numpy()).cuda(),
-                                                 requires_grad=False)
-
+        target_params_variables[name] = target_model.state_dict()[name].clone().detach().requires_grad_(False)
     current_number_of_adversaries = 0
     for model_id, _ in train_data_sets:
         if model_id == -1 or model_id in helper.params['adversary_list']:
@@ -73,10 +68,8 @@ def train(helper, epoch, train_data_sets, local_model, target_model, is_poison, 
             current_data_model, train_data = train_data_sets[model_id]
             ntokens = len(helper.corpus.dictionary)
             hidden = model.init_hidden(helper.params['batch_size'])
-            dataset_size = len(train_data)
         else:
             _, (current_data_model, train_data) = train_data_sets[model_id]
-            dataset_size = len(train_data.dataset)
         batch_size = helper.params['batch_size']
         ### For a 'poison_epoch' we perform single shot poisoning
 
@@ -240,8 +233,8 @@ def train(helper, epoch, train_data_sets, local_model, target_model, is_poison, 
                                         target_model.state_dict()[name] + clipped_difference)
 
                         elif helper.params['type'] == 'text':
-                            torch.nn.utils.clip_grad_norm(model.parameters(),
-                                                          helper.params['clip'])
+                            torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                                           helper.params['clip'])
                             poison_optimizer.step()
                         else:
                             poison_optimizer.step()
@@ -374,7 +367,7 @@ def train(helper, epoch, train_data_sets, local_model, target_model, is_poison, 
                     elif helper.params['type'] == 'text':
                         # `clip_grad_norm` helps prevent the exploding gradient
                         # problem in RNNs / LSTMs.
-                        torch.nn.utils.clip_grad_norm(model.parameters(), helper.params['clip'])
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), helper.params['clip'])
                         optimizer.step()
                     else:
                         optimizer.step()
@@ -383,7 +376,7 @@ def train(helper, epoch, train_data_sets, local_model, target_model, is_poison, 
 
                     if helper.params["report_train_loss"] and batch % helper.params[
                         'log_interval'] == 0 and batch > 0:
-                        cur_loss = total_loss[0] / helper.params['log_interval']
+                        cur_loss = total_loss.item() / helper.params['log_interval']
                         elapsed = time.time() - start_time
                         logger.info('model {} | epoch {:3d} | internal_epoch {:3d} '
                                     '| {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
@@ -466,7 +459,7 @@ def test(helper, epoch, data_source,
             total_loss += len(data) * criterion(output_flat, targets).data
             hidden = helper.repackage_hidden(hidden)
             pred = output_flat.data.max(1)[1]
-            correct += pred.eq(targets.data).sum()
+            correct += pred.eq(targets.data).sum().to(dtype=torch.float)
             total_test_words += targets.data.shape[0]
 
             ### output random result :)
@@ -489,21 +482,28 @@ def test(helper, epoch, data_source,
         else:
             output = model(data)
             total_loss += nn.functional.cross_entropy(output, targets,
-                                              size_average=False).data[0]  # sum up batch loss
+                                              reduction='sum').item() # sum up batch loss
             pred = output.data.max(1)[1]  # get the index of the max log-probability
-            correct += pred.eq(targets.data.view_as(pred)).cpu().sum()
+            correct += pred.eq(targets.data.view_as(pred)).cpu().sum().item()
 
     if helper.params['type'] == 'text':
-        acc = 100. * correct / total_test_words
-        total_l = total_loss[0] / dataset_size
+        acc = 100.0 * (correct / total_test_words)
+        total_l = total_loss.item() / (dataset_size-1)
+        logger.info('___Test {} poisoned: {}, epoch: {}: Average loss: {:.4f}, '
+                    'Accuracy: {}/{} ({:.4f}%)'.format(model.name, is_poison, epoch,
+                                                       total_l, correct, total_test_words,
+                                                       acc))
+        acc = acc.item()
+        total_l = total_l.item()
     else:
-        acc = 100. * correct / dataset_size
+        acc = 100.0 * (float(correct) / float(dataset_size))
         total_l = total_loss / dataset_size
 
-    logger.info('___Test {} poisoned: {}, epoch: {}: Average loss: {:.4f}, '
-                'Accuracy: {}/{} ({:.0f}%)'.format(model.name, is_poison, epoch,
-                                                   total_l, correct, dataset_size,
-                                                   acc))
+        logger.info('___Test {} poisoned: {}, epoch: {}: Average loss: {:.4f}, '
+                    'Accuracy: {}/{} ({:.4f}%)'.format(model.name, is_poison, epoch,
+                                                       total_l, correct, dataset_size,
+                                                       acc))
+
     if visualize:
         model.visualize(vis, epoch, acc, total_l if helper.params['report_test_loss'] else None,
                         eid=helper.params['environment_name'], is_poisoned=is_poison)
@@ -514,9 +514,9 @@ def test(helper, epoch, data_source,
 def test_poison(helper, epoch, data_source,
                 model, is_poison=False, visualize=True):
     model.eval()
-    total_loss = 0
-    correct = 0
-    total_test_words = 0
+    total_loss = 0.0
+    correct = 0.0
+    total_test_words = 0.0
     batch_size = helper.params['test_batch_size']
     if helper.params['type'] == 'text':
         ntokens = len(helper.corpus.dictionary)
@@ -526,9 +526,6 @@ def test_poison(helper, epoch, data_source,
     else:
         data_iterator = data_source
         dataset_size = 1000
-
-    batch_random_no = random.randint(0, len(data_iterator)-1)
-    predictions_difference_list = list()
 
     for batch_id, batch in enumerate(data_iterator):
         if helper.params['type'] == 'image':
@@ -560,17 +557,15 @@ def test_poison(helper, epoch, data_source,
         else:
             output = model(data)
             total_loss += nn.functional.cross_entropy(output, targets,
-                                              size_average=False).data[0]  # sum up batch loss
+                                              reduction='sum').data.item()  # sum up batch loss
             pred = output.data.max(1)[1]  # get the index of the max log-probability
-
-            correct += pred.eq(targets.data.view_as(pred)).cpu().sum()
-
+            correct += pred.eq(targets.data.view_as(pred)).cpu().sum().to(dtype=torch.float)
 
     if helper.params['type'] == 'text':
-        acc = 100. * correct / total_test_words
-        total_l = total_loss[0] / dataset_size
+        acc = 100.0 * (correct / total_test_words)
+        total_l = total_loss.item() / dataset_size
     else:
-        acc = 100. * correct / dataset_size
+        acc = 100.0 * (correct / dataset_size)
         total_l = total_loss / dataset_size
     logger.info('___Test {} poisoned: {}, epoch: {}: Average loss: {:.4f}, '
                 'Accuracy: {}/{} ({:.0f}%)'.format(model.name, is_poison, epoch,
@@ -588,7 +583,7 @@ if __name__ == '__main__':
     time_start_load_everything = time.time()
 
     parser = argparse.ArgumentParser(description='PPDL')
-    parser.add_argument('--params', dest='params', default='params_words.json')
+    parser.add_argument('--params', dest='params')
     args = parser.parse_args()
 
     with open(f'./{args.params}', 'r') as f:
@@ -628,6 +623,10 @@ if __name__ == '__main__':
 
     weight_accumulator = None
 
+    # save parameters:
+    with open(f'{helper.folder_path}/params.yaml', 'w') as f:
+        yaml.dump(helper.params, f)
+    dist_list = list()
     for epoch in range(helper.start_epoch, helper.params['epochs'] + 1):
         start_time = time.time()
 
@@ -659,13 +658,14 @@ if __name__ == '__main__':
                                                        'number_of_adversaries'])
             else:
                 subset_data_chunks = random.sample(participant_ids[1:], helper.params['no_models'])
-
+                logger.info(f'Selected models: {subset_data_chunks}')
+        t=time.time()
         weight_accumulator = train(helper=helper, epoch=epoch,
                                    train_data_sets=[(pos, helper.train_data[pos]) for pos in
                                                     subset_data_chunks],
                                    local_model=helper.local_model, target_model=helper.target_model,
                                    is_poison=helper.params['is_poison'], last_weight_accumulator=weight_accumulator)
-
+        logger.info(f'time spent on training: {time.time() - t}')
         # Average the models
         helper.average_shrink_models(target_model=helper.target_model,
                                      weight_accumulator=weight_accumulator, epoch=epoch)
