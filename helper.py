@@ -232,6 +232,9 @@ class Helper:
 
     # Save local model
     def save_local_model(self, model, epoch, val_loss, val_acc, adversary=False):
+        if epoch not in self.params['save_on_epochs']:
+            return
+        
         logger.info("Saving local model at epoch: {}".format(epoch))
         if adversary:
             model_name = '{0}/adversary_model_epoch_{}.pt.tar'.format(self.params['folder_path'], epoch)
