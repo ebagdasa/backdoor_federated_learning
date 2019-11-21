@@ -80,50 +80,25 @@ class ImageHelper(Helper):
 
         return per_participant_list
 
+    # Prepare (sample) non-poisoned data TO BE poisoned in training.py
     def poison_dataset(self):
-        #
-        # return [(self.train_dataset[self.params['poison_image_id']][0],
-        # torch.IntTensor(self.params['poison_label_swap']))]
-        cifar_classes = {}
-        for ind, x in enumerate(self.train_dataset):
-            _, label = x
-            if ind in self.params['poison_images'] or ind in self.params['poison_images_test']:
-                continue
-            if label in cifar_classes:
-                cifar_classes[label].append(ind)
-            else:
-                cifar_classes[label] = [ind]
-        indices = list()
-        # create array that starts with poisoned images
-
-        #create candidates:
-        # range_no_id = cifar_classes[1]
-        # range_no_id.extend(cifar_classes[1])
+        # Remove poisoned images from range_no_id
         range_no_id = list(range(50000))
-        for image in self.params['poison_images'] + self.params['poison_images_test']:
-            if image in range_no_id:
-                range_no_id.remove(image)
+        range_no_id = range_no_id - list(set(self.params['poison_images'] + self.params['poison_images_test']))
 
-        # add random images to other parts of the batch
+        # Create the sampler indices of non-poisoned images
+        indices = list()
         for batches in range(0, self.params['size_of_secret_dataset']):
             range_iter = random.sample(range_no_id,
                                        self.params['batch_size'])
-            # range_iter[0] = self.params['poison_images'][0]
-            indices.extend(range_iter)
-            # range_iter = random.sample(range_no_id,
-            #            self.params['batch_size']
-            #                -len(self.params['poison_images'])*self.params['poisoning_per_batch'])
-            # for i in range(0, self.params['poisoning_per_batch']):
-            #     indices.extend(self.params['poison_images'])
-            # indices.extend(range_iter)
+            indices.extend(range_iter)  # size_of_secret_dataset * batch_size image ids
+
         return torch.utils.data.DataLoader(self.train_dataset,
                            batch_size=self.params['batch_size'],
                            sampler=torch.utils.data.sampler.SubsetRandomSampler(indices))
 
+    # Prepare 1000 data used to evaluate poisoned models when training them
     def poison_test_dataset(self):
-        #
-        # return [(self.train_dataset[self.params['poison_image_id']][0],
-        # torch.IntTensor(self.params['poison_label_swap']))]
         return torch.utils.data.DataLoader(self.train_dataset,
                            batch_size=self.params['batch_size'],
                            sampler=torch.utils.data.sampler.SubsetRandomSampler(
@@ -134,7 +109,7 @@ class ImageHelper(Helper):
     def load_data(self):
         logger.info('Loading data')
 
-        ### data load
+        # Transform training and test data
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
@@ -152,52 +127,36 @@ class ImageHelper(Helper):
 
         self.test_dataset = datasets.CIFAR10('./data', train=False, transform=transform_test)
 
+        # If sampling training dataset of PCPs based on Dirichlet distribution
         if self.params['sampling_dirichlet']:
-            ## sample indices for participants using Dirichlet distribution
             indices_per_participant = self.sample_dirichlet_train_data(
                 self.params['number_of_total_participants'],
                 alpha=self.params['dirichlet_alpha'])
             train_loaders = [(pos, self.get_train(indices)) for pos, indices in
                              indices_per_participant.items()]
+        # Else, sample 500 training images for each PCP
         else:
-            ## sample indices for participants that are equally
-            # splitted to 500 images per participant
             all_range = list(range(len(self.train_dataset)))
             random.shuffle(all_range)
             train_loaders = [(pos, self.get_train_old(all_range, pos))
                              for pos in range(self.params['number_of_total_participants'])]
-        self.train_data = train_loaders
+
+        self.train_data = train_loaders   # of the form [(pcp_id, sample_train_data)]
         self.test_data = self.get_test()
         self.poisoned_data_for_train = self.poison_dataset()
         self.test_data_poison = self.poison_test_dataset()
-        # self.params['adversary_list'] = [POISONED_PARTICIPANT_POS] + \
-        #                            random.sample(range(len(train_loaders)),
-        #                                          self.params['number_of_adversaries'] - 1)
-        # logger.info(f"Poisoned following participants: {self.params['adversary_list']}")
 
 
+    # Prepare training data based on Dirichlet distribution
     def get_train(self, indices):
-        """
-        This method is used along with Dirichlet distribution
-        :param params:
-        :param indices:
-        :return:
-        """
         train_loader = torch.utils.data.DataLoader(self.train_dataset,
                                            batch_size=self.params['batch_size'],
                                            sampler=torch.utils.data.sampler.SubsetRandomSampler(
                                                indices))
         return train_loader
 
+    # Prepare equally split training data
     def get_train_old(self, all_range, model_no):
-        """
-        This method equally splits the dataset.
-        :param params:
-        :param all_range:
-        :param model_no:
-        :return:
-        """
-
         data_len = int(len(self.train_dataset) / self.params['number_of_total_participants'])
         sub_indices = all_range[model_no * data_len: (model_no + 1) * data_len]
         train_loader = torch.utils.data.DataLoader(self.train_dataset,

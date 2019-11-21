@@ -212,13 +212,14 @@ class Helper:
 
         return True
 
+    # Save global model
     def save_model(self, model=None, epoch=0, val_loss=0):
         if model is None:
             model = self.target_model
         if self.params['save_model']:
             # save_model
             logger.info("saving model")
-            model_name = '{0}/model_last.pt.tar'.format(self.params['folder_path'])
+            model_name = '{0}/global_model_last.pt.tar'.format(self.params['folder_path'])
             saved_dict = {'state_dict': model.state_dict(), 'epoch': epoch,
                           'lr': self.params['lr']}
             self.save_checkpoint(saved_dict, False, model_name)
@@ -228,6 +229,19 @@ class Helper:
             if val_loss < self.best_loss:
                 self.save_checkpoint(saved_dict, False, f'{model_name}.best')
                 self.best_loss = val_loss
+
+    # Save local model
+    def save_local_model(self, model, epoch, val_loss, val_acc, adversary=False):
+        logger.info("Saving local model at epoch: {}".format(epoch))
+        if adversary:
+            model_name = '{0}/adversary_model_epoch_{}.pt.tar'.format(self.params['folder_path'], epoch)
+        else:
+            model_name = '{0}/benign_model_epoch_{}.pt.tar'.format(self.params['folder_path'], epoch)
+
+        saved_dict = {'state_dict': model.state_dict(), 'epoch': epoch, 'val_loss': val_loss, 'val_acc': val_acc}
+        self.save_checkpoint(saved_dict, False, model_name)
+
+
 
     def estimate_fisher(self, model, criterion,
                         data_loader, sample_size, batch_size=64):
