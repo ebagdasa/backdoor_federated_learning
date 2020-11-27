@@ -1,5 +1,9 @@
+**11/20/2020: We are developing a new framework for backdoors with FL: [Backdoors101](https://github.com/ebagdasa/backdoors101).**
+It extends to many new attacks (clean-label, physical backdoors, etc) and has improved user experience. Check it out!
+
 # backdoor_federated_learning
 This code includes experiments for paper "How to Backdoor Federated Learning" (https://arxiv.org/abs/1807.00459)
+
 
 All experiments are done using Python 3.7 and PyTorch 1.0.
 
